@@ -1,77 +1,51 @@
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+
 #include <errno.h>
+
 #include <signal.h>
 #include <sys/time.h>
 #include <time.h>
-#ifdef __APPLE__
-#include <pthread.h>
-#include <unistd.h>
-#endif
 #include "../td-usb.h"
 #include "../tdtimer.h"
 
-#ifndef __APPLE__
 timer_t timerid = 0;
-#endif
 
-static int(*pHandler)(td_context_t *);
-static td_context_t *pUserParam;
-#ifdef __APPLE__
-static int timer_interval_ms = 0;
-#endif
+static void(*pHandler)(void *);
+static void *pUserParam;
 
-int _nanosleep(int sec, int nsec)
-{
-    struct timespec req, rem;
-    req.tv_sec = sec;
-    req.tv_nsec = nsec;
-    rem.tv_sec = 0;
-    rem.tv_nsec = 0;
-    while (nanosleep(&req, &rem)) {
-        if (errno == EINTR) {
-            req.tv_sec = rem.tv_sec;
-            req.tv_nsec = rem.tv_nsec;
-        } else {
-            perror("nanosleep error");
-            return -1;
-        }
-    }
-    return 0;
-}
 
 static void timer_handler(int sig, siginfo_t *si, void *uc)
 {
 	pHandler(pUserParam);
 }
 
-#ifdef __APPLE__
-static void *timer_thread(void *arg)
+int _nanosleep(int sec, int nsec)
 {
-	while (1) {
-		usleep(timer_interval_ms * 1000);
-		pHandler(pUserParam);
+	struct timespec req, rem;
+
+	req.tv_sec = sec;
+	req.tv_nsec = nsec;
+	rem.tv_sec = 0;
+	rem.tv_nsec = 0;
+	while (nanosleep(&req, &rem)) {
+		if (errno == EINTR) {
+			req.tv_sec = rem.tv_sec;
+			req.tv_nsec = rem.tv_nsec;
+		}
+		else {
+			perror("nanosleep error");
+			return -1;
+		}
 	}
-	return NULL;
+	return 0;
 }
-#endif
 
-int TdTimer_Start(int pCallback(td_context_t *), td_context_t *pParam, int Interval)
+
+int TdTimer_Start(void pCallback(void *), void *pParam, int Interval)
 {
-#ifdef __APPLE__
-	pthread_t thread;
-
-	pHandler = pCallback;
-	pUserParam = pParam;
-	timer_interval_ms = Interval;
-
-	pthread_create(&thread, NULL, timer_thread, NULL);
-
-	while (1) {
-		_nanosleep(1, 0);
-	}
-#else
 	long long freq_nanosecs;
 	struct sigaction sa;
 	struct sigevent sev;
@@ -103,5 +77,4 @@ int TdTimer_Start(int pCallback(td_context_t *), td_context_t *pParam, int Inter
 	{		
 		_nanosleep(1, 0);    /* sleep 1 sec */
 	}
-#endif
 }

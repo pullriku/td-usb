@@ -1,4 +1,6 @@
 // tdtimer.h
 #pragma once
 
-int TdTimer_Start(void pCallback(void *), void *pParam, int interval);
+typedef struct td_context td_context_t;
+
+int TdTimer_Start(int pCallback(td_context_t *), td_context_t *pParam, int interval);
